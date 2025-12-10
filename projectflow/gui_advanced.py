@@ -1,0 +1,1110 @@
+"""
+ProjectFlow - Interface Graphique Avancée
+
+Features:
+- Dashboard avec graphiques
+- Système de thèmes
+- Timer Pomodoro
+- Badges et gamification
+- Multi-objectifs
+- Scénarios What-if
+"""
+
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+import os
+import sys
+import json
+from datetime import datetime
+
+# Imports des modules ProjectFlow
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from projectflow import storage, finance, planning, export_html
+from projectflow.themes import obtenir_theme_manager, obtenir_theme, THEMES
+from projectflow.charts import LineChart, PieChart, BarChart, ProgressRing, SparkLine
+from projectflow.achievements import AchievementManager, BADGES, obtenir_titre_niveau, obtenir_couleur_niveau
+from projectflow.timer import TimeTracker, formater_duree
+from projectflow.finance_advanced import (
+    CATEGORIES_DEPENSES, DepensesCategories, Scenario,
+    comparer_scenarios, generer_recommandations
+)
+
+
+class App:
+    """Application principale ProjectFlow avancée."""
+
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.title("ProjectFlow Pro")
+        self.root.geometry("1400x800")
+        self.root.minsize(1200, 700)
+
+        # Gestionnaires
+        self.theme_manager = obtenir_theme_manager()
+        self.achievements = self._charger_achievements()
+        self.time_tracker = self._charger_time_tracker()
+
+        # État
+        self.current_page = "dashboard"
+        self.current_projet = None
+        self.timer_running = False
+        self.timer_job = None
+
+        # Appliquer le thème
+        self.theme = self.theme_manager.theme
+        self.root.configure(bg=self.theme.bg_primary)
+
+        # Construire l'interface
+        self._build_ui()
+        self._show_dashboard()
+
+        # Centrer
+        self._center_window()
+
+    def _charger_achievements(self) -> AchievementManager:
+        """Charge les achievements depuis le fichier."""
+        try:
+            if os.path.exists("projectflow_achievements.json"):
+                with open("projectflow_achievements.json", "r", encoding="utf-8") as f:
+                    return AchievementManager.from_dict(json.load(f))
+        except:
+            pass
+        return AchievementManager()
+
+    def _sauvegarder_achievements(self):
+        """Sauvegarde les achievements."""
+        try:
+            with open("projectflow_achievements.json", "w", encoding="utf-8") as f:
+                json.dump(self.achievements.to_dict(), f, ensure_ascii=False, indent=2)
+        except:
+            pass
+
+    def _charger_time_tracker(self) -> TimeTracker:
+        """Charge le time tracker."""
+        try:
+            if os.path.exists("projectflow_time.json"):
+                with open("projectflow_time.json", "r", encoding="utf-8") as f:
+                    return TimeTracker.from_dict(json.load(f))
+        except:
+            pass
+        return TimeTracker()
+
+    def _sauvegarder_time_tracker(self):
+        """Sauvegarde le time tracker."""
+        try:
+            with open("projectflow_time.json", "w", encoding="utf-8") as f:
+                json.dump(self.time_tracker.to_dict(), f, ensure_ascii=False, indent=2)
+        except:
+            pass
+
+    def _center_window(self):
+        """Centre la fenêtre."""
+        self.root.update_idletasks()
+        w = self.root.winfo_width()
+        h = self.root.winfo_height()
+        x = (self.root.winfo_screenwidth() // 2) - (w // 2)
+        y = (self.root.winfo_screenheight() // 2) - (h // 2)
+        self.root.geometry(f"+{x}+{y}")
+
+    def _build_ui(self):
+        """Construit l'interface."""
+        # Sidebar
+        self.sidebar = tk.Frame(self.root, bg=self.theme.bg_secondary, width=280)
+        self.sidebar.pack(side="left", fill="y")
+        self.sidebar.pack_propagate(False)
+
+        self._build_sidebar()
+
+        # Zone principale
+        self.main = tk.Frame(self.root, bg=self.theme.bg_primary)
+        self.main.pack(side="right", fill="both", expand=True)
+
+    def _build_sidebar(self):
+        """Construit la sidebar."""
+        # Header avec niveau
+        header = tk.Frame(self.sidebar, bg=self.theme.bg_secondary)
+        header.pack(fill="x", padx=20, pady=20)
+
+        # Logo
+        logo = tk.Label(header, text="ProjectFlow", font=("Segoe UI", 20, "bold"),
+                       fg=self.theme.accent, bg=self.theme.bg_secondary)
+        logo.pack()
+
+        # Niveau utilisateur
+        niveau_info = self.achievements.obtenir_progression_niveau()
+        niveau_frame = tk.Frame(header, bg=self.theme.bg_secondary)
+        niveau_frame.pack(pady=10)
+
+        titre = obtenir_titre_niveau(niveau_info["niveau"])
+        couleur = obtenir_couleur_niveau(niveau_info["niveau"])
+
+        niveau_label = tk.Label(niveau_frame, text=f"Niv. {niveau_info['niveau']} - {titre}",
+                               font=("Segoe UI", 11, "bold"), fg=couleur,
+                               bg=self.theme.bg_secondary)
+        niveau_label.pack()
+
+        points_label = tk.Label(niveau_frame, text=f"{niveau_info['points_totaux']} pts",
+                               font=("Segoe UI", 9), fg=self.theme.text_muted,
+                               bg=self.theme.bg_secondary)
+        points_label.pack()
+
+        # Barre de progression niveau
+        prog_frame = tk.Frame(header, bg=self.theme.bg_secondary)
+        prog_frame.pack(fill="x", pady=5)
+
+        prog_canvas = tk.Canvas(prog_frame, width=200, height=6,
+                               bg=self.theme.bg_input, highlightthickness=0)
+        prog_canvas.pack()
+
+        prog_width = int(200 * niveau_info["progression"])
+        if prog_width > 0:
+            prog_canvas.create_rectangle(0, 0, prog_width, 6, fill=couleur, outline="")
+
+        # Navigation
+        nav_frame = tk.Frame(self.sidebar, bg=self.theme.bg_secondary)
+        nav_frame.pack(fill="x", pady=10)
+
+        nav_items = [
+            ("dashboard", "📊", "Tableau de bord"),
+            ("projects", "📁", "Mes Projets"),
+            ("new", "➕", "Nouveau Projet"),
+            ("timer", "⏱️", "Timer"),
+            ("achievements", "🏆", "Badges"),
+            ("scenarios", "🔮", "Scénarios"),
+            ("settings", "⚙️", "Paramètres"),
+        ]
+
+        self.nav_buttons = {}
+        for key, icon, text in nav_items:
+            btn = tk.Frame(nav_frame, bg=self.theme.bg_secondary, cursor="hand2")
+            btn.pack(fill="x")
+
+            inner = tk.Label(btn, text=f"  {icon}  {text}", font=("Segoe UI", 11),
+                           fg=self.theme.text_secondary, bg=self.theme.bg_secondary,
+                           anchor="w", padx=20, pady=12)
+            inner.pack(fill="x")
+
+            inner.bind("<Button-1>", lambda e, k=key: self._navigate(k))
+            inner.bind("<Enter>", lambda e, b=inner: b.config(bg=self.theme.bg_card))
+            inner.bind("<Leave>", lambda e, b=inner, k=key: self._update_nav_style(b, k))
+
+            self.nav_buttons[key] = inner
+
+        # Streak en bas
+        streak_frame = tk.Frame(self.sidebar, bg=self.theme.bg_card)
+        streak_frame.pack(side="bottom", fill="x", padx=15, pady=15)
+
+        streak_inner = tk.Frame(streak_frame, bg=self.theme.bg_card, padx=15, pady=10)
+        streak_inner.pack(fill="x")
+
+        tk.Label(streak_inner, text="🔥 Streak", font=("Segoe UI", 10, "bold"),
+                fg=self.theme.warning, bg=self.theme.bg_card).pack(anchor="w")
+
+        tk.Label(streak_inner, text=f"{self.achievements.streak_actuel} jours",
+                font=("Segoe UI", 18, "bold"), fg=self.theme.text_primary,
+                bg=self.theme.bg_card).pack(anchor="w")
+
+        tk.Label(streak_inner, text=f"Record: {self.achievements.meilleur_streak}",
+                font=("Segoe UI", 9), fg=self.theme.text_muted,
+                bg=self.theme.bg_card).pack(anchor="w")
+
+    def _update_nav_style(self, btn, key):
+        """Met à jour le style de navigation."""
+        if key == self.current_page:
+            btn.config(bg=self.theme.bg_card, fg=self.theme.accent)
+        else:
+            btn.config(bg=self.theme.bg_secondary, fg=self.theme.text_secondary)
+
+    def _navigate(self, page):
+        """Navigation entre les pages."""
+        self.current_page = page
+
+        # Mettre à jour styles
+        for key, btn in self.nav_buttons.items():
+            if key == page:
+                btn.config(bg=self.theme.bg_card, fg=self.theme.accent)
+            else:
+                btn.config(bg=self.theme.bg_secondary, fg=self.theme.text_secondary)
+
+        # Afficher la page
+        pages = {
+            "dashboard": self._show_dashboard,
+            "projects": self._show_projects,
+            "new": self._show_new_project,
+            "timer": self._show_timer,
+            "achievements": self._show_achievements,
+            "scenarios": self._show_scenarios,
+            "settings": self._show_settings
+        }
+
+        if page in pages:
+            pages[page]()
+
+    def _clear_main(self):
+        """Efface la zone principale."""
+        for widget in self.main.winfo_children():
+            widget.destroy()
+
+    def _show_dashboard(self):
+        """Affiche le tableau de bord."""
+        self._clear_main()
+
+        # Scroll
+        canvas = tk.Canvas(self.main, bg=self.theme.bg_primary, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.main, orient="vertical", command=canvas.yview)
+        content = tk.Frame(canvas, bg=self.theme.bg_primary)
+
+        content.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=content, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Header
+        header = tk.Frame(content, bg=self.theme.bg_primary)
+        header.pack(fill="x", padx=40, pady=30)
+
+        tk.Label(header, text="Tableau de bord", font=("Segoe UI", 24, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(side="left")
+
+        date_str = datetime.now().strftime("%d %B %Y")
+        tk.Label(header, text=date_str, font=("Segoe UI", 12),
+                fg=self.theme.text_muted, bg=self.theme.bg_primary).pack(side="right")
+
+        # Stats rapides
+        stats_frame = tk.Frame(content, bg=self.theme.bg_primary)
+        stats_frame.pack(fill="x", padx=40, pady=10)
+
+        projets = storage.lister_projets()
+        total_epargne = sum(p.get("simulation", {}).get("total_epargne", 0) for p in projets)
+        objectifs_atteints = sum(1 for p in projets if p.get("progression", 0) >= 1)
+
+        stats = [
+            ("Projets", len(projets), self.theme.accent, "📁"),
+            ("Épargne totale", f"{total_epargne:,.0f}€", self.theme.success, "💰"),
+            ("Objectifs atteints", objectifs_atteints, self.theme.warning, "🎯"),
+            ("Badges", len(self.achievements.badges_obtenus), self.theme.danger, "🏆"),
+        ]
+
+        for i, (label, value, color, icon) in enumerate(stats):
+            card = tk.Frame(stats_frame, bg=self.theme.bg_card, padx=20, pady=15)
+            card.pack(side="left", padx=10, expand=True, fill="x")
+
+            tk.Label(card, text=icon, font=("Segoe UI", 24),
+                    bg=self.theme.bg_card).pack(anchor="w")
+
+            tk.Label(card, text=str(value), font=("Segoe UI", 28, "bold"),
+                    fg=color, bg=self.theme.bg_card).pack(anchor="w")
+
+            tk.Label(card, text=label, font=("Segoe UI", 11),
+                    fg=self.theme.text_secondary, bg=self.theme.bg_card).pack(anchor="w")
+
+        # Graphiques
+        charts_frame = tk.Frame(content, bg=self.theme.bg_primary)
+        charts_frame.pack(fill="x", padx=40, pady=20)
+
+        # Graphique d'épargne
+        if projets:
+            chart_card = tk.Frame(charts_frame, bg=self.theme.bg_card, padx=20, pady=20)
+            chart_card.pack(side="left", padx=10, expand=True, fill="both")
+
+            tk.Label(chart_card, text="Évolution de l'épargne", font=("Segoe UI", 14, "bold"),
+                    fg=self.theme.text_primary, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 10))
+
+            # Trouver le projet avec le plus de données
+            best_projet = max(projets, key=lambda p: len(p.get("simulation", {}).get("tableau_mensuel", [])))
+            simulation = best_projet.get("simulation", {})
+
+            if simulation.get("tableau_mensuel"):
+                chart_canvas = tk.Canvas(chart_card, width=450, height=250,
+                                        bg=self.theme.bg_card, highlightthickness=0)
+                chart_canvas.pack()
+
+                chart = LineChart(chart_canvas, 0, 0, 450, 250)
+                chart.draw(
+                    simulation["tableau_mensuel"][:12],
+                    objectif=best_projet.get("finances", {}).get("objectif", 0)
+                )
+
+        # Répartition dépenses
+        depenses_card = tk.Frame(charts_frame, bg=self.theme.bg_card, padx=20, pady=20)
+        depenses_card.pack(side="left", padx=10, expand=True, fill="both")
+
+        tk.Label(depenses_card, text="Répartition type", font=("Segoe UI", 14, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 10))
+
+        pie_canvas = tk.Canvas(depenses_card, width=300, height=250,
+                              bg=self.theme.bg_card, highlightthickness=0)
+        pie_canvas.pack()
+
+        # Données exemple
+        pie_data = [
+            ("Logement", 800),
+            ("Alimentation", 400),
+            ("Transport", 200),
+            ("Loisirs", 150),
+            ("Autres", 100)
+        ]
+
+        pie = PieChart(pie_canvas, 0, 0, 300)
+        pie.draw(pie_data)
+
+        # Projets récents
+        recent_frame = tk.Frame(content, bg=self.theme.bg_primary)
+        recent_frame.pack(fill="x", padx=40, pady=20)
+
+        tk.Label(recent_frame, text="Projets récents", font=("Segoe UI", 16, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(anchor="w", pady=(0, 15))
+
+        for projet in projets[:3]:
+            self._create_project_card(recent_frame, projet)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+
+    def _create_project_card(self, parent, projet):
+        """Crée une carte de projet."""
+        card = tk.Frame(parent, bg=self.theme.bg_card, padx=20, pady=15)
+        card.pack(fill="x", pady=5)
+
+        # Header
+        header = tk.Frame(card, bg=self.theme.bg_card)
+        header.pack(fill="x")
+
+        tk.Label(header, text=projet["nom"], font=("Segoe UI", 14, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_card).pack(side="left")
+
+        progression = projet.get("progression", 0)
+        prog_text = f"{progression*100:.0f}%"
+        prog_color = self.theme.success if progression >= 1 else self.theme.accent
+
+        tk.Label(header, text=prog_text, font=("Segoe UI", 12, "bold"),
+                fg=prog_color, bg=self.theme.bg_card).pack(side="right")
+
+        # Barre de progression
+        prog_frame = tk.Frame(card, bg=self.theme.bg_card)
+        prog_frame.pack(fill="x", pady=10)
+
+        prog_canvas = tk.Canvas(prog_frame, width=400, height=8,
+                               bg=self.theme.bg_input, highlightthickness=0)
+        prog_canvas.pack(fill="x")
+
+        prog_width = int(400 * progression)
+        if prog_width > 0:
+            prog_canvas.create_rectangle(0, 0, prog_width, 8, fill=prog_color, outline="")
+
+        # Info
+        finances = projet.get("finances", {})
+        tk.Label(card, text=f"Objectif: {finances.get('objectif', 0):,.0f}€",
+                font=("Segoe UI", 11), fg=self.theme.text_secondary,
+                bg=self.theme.bg_card).pack(anchor="w")
+
+        # Bouton
+        btn = tk.Label(card, text="Ouvrir →", font=("Segoe UI", 10),
+                      fg=self.theme.accent, bg=self.theme.bg_card, cursor="hand2")
+        btn.pack(anchor="e", pady=(10, 0))
+        btn.bind("<Button-1>", lambda e, p=projet: self._open_project(p))
+
+    def _show_projects(self):
+        """Affiche la liste des projets."""
+        self._clear_main()
+
+        header = tk.Frame(self.main, bg=self.theme.bg_primary)
+        header.pack(fill="x", padx=40, pady=30)
+
+        tk.Label(header, text="Mes Projets", font=("Segoe UI", 24, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(side="left")
+
+        # Bouton nouveau
+        new_btn = tk.Label(header, text="➕ Nouveau", font=("Segoe UI", 11, "bold"),
+                          fg=self.theme.text_primary, bg=self.theme.accent,
+                          padx=20, pady=8, cursor="hand2")
+        new_btn.pack(side="right")
+        new_btn.bind("<Button-1>", lambda e: self._navigate("new"))
+
+        # Liste
+        list_frame = tk.Frame(self.main, bg=self.theme.bg_primary)
+        list_frame.pack(fill="both", expand=True, padx=40)
+
+        projets = storage.lister_projets()
+
+        if not projets:
+            tk.Label(list_frame, text="Aucun projet\n\nCréez votre premier projet !",
+                    font=("Segoe UI", 14), fg=self.theme.text_muted,
+                    bg=self.theme.bg_primary, justify="center").pack(pady=100)
+        else:
+            for projet in projets:
+                self._create_project_card(list_frame, projet)
+
+    def _show_new_project(self):
+        """Formulaire nouveau projet."""
+        self._clear_main()
+
+        # Scroll
+        canvas = tk.Canvas(self.main, bg=self.theme.bg_primary, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.main, orient="vertical", command=canvas.yview)
+        content = tk.Frame(canvas, bg=self.theme.bg_primary)
+
+        content.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=content, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Header
+        tk.Label(content, text="Nouveau Projet", font=("Segoe UI", 24, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(anchor="w", padx=40, pady=30)
+
+        # Formulaire
+        form = tk.Frame(content, bg=self.theme.bg_card, padx=30, pady=25)
+        form.pack(fill="x", padx=40, pady=10)
+
+        # Nom
+        tk.Label(form, text="Nom du projet", font=("Segoe UI", 11),
+                fg=self.theme.text_secondary, bg=self.theme.bg_card).pack(anchor="w")
+
+        self.entry_nom = tk.Entry(form, font=("Segoe UI", 12), bg=self.theme.bg_input,
+                                 fg=self.theme.text_primary, relief="flat",
+                                 insertbackground=self.theme.text_primary)
+        self.entry_nom.pack(fill="x", pady=(5, 15), ipady=8)
+
+        # Finances
+        tk.Label(form, text="Données financières", font=("Segoe UI", 14, "bold"),
+                fg=self.theme.accent, bg=self.theme.bg_card).pack(anchor="w", pady=(20, 10))
+
+        fields = [
+            ("Revenus mensuels (€)", "entry_revenus"),
+            ("Dépenses fixes (€)", "entry_fixes"),
+            ("Dépenses variables (€)", "entry_variables"),
+            ("Objectif (€)", "entry_objectif"),
+            ("Durée simulation (mois)", "entry_duree")
+        ]
+
+        for label, attr in fields:
+            tk.Label(form, text=label, font=("Segoe UI", 11),
+                    fg=self.theme.text_secondary, bg=self.theme.bg_card).pack(anchor="w")
+
+            entry = tk.Entry(form, font=("Segoe UI", 12), bg=self.theme.bg_input,
+                           fg=self.theme.text_primary, relief="flat",
+                           insertbackground=self.theme.text_primary)
+            entry.pack(fill="x", pady=(5, 10), ipady=8)
+            setattr(self, attr, entry)
+
+        # Planning
+        tk.Label(form, text="Planning", font=("Segoe UI", 14, "bold"),
+                fg=self.theme.accent, bg=self.theme.bg_card).pack(anchor="w", pady=(20, 10))
+
+        jours_frame = tk.Frame(form, bg=self.theme.bg_card)
+        jours_frame.pack(fill="x", pady=10)
+
+        self.jours_vars = {}
+        jours = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"]
+
+        for jour in jours:
+            var = tk.BooleanVar()
+            cb = tk.Checkbutton(jours_frame, text=jour, variable=var,
+                               font=("Segoe UI", 10), fg=self.theme.text_primary,
+                               bg=self.theme.bg_card, selectcolor=self.theme.bg_input,
+                               activebackground=self.theme.bg_card)
+            cb.pack(side="left", padx=5)
+            self.jours_vars[jour.lower()] = var
+
+        tk.Label(form, text="Heures par semaine", font=("Segoe UI", 11),
+                fg=self.theme.text_secondary, bg=self.theme.bg_card).pack(anchor="w", pady=(10, 0))
+
+        self.entry_heures = tk.Entry(form, font=("Segoe UI", 12), bg=self.theme.bg_input,
+                                    fg=self.theme.text_primary, relief="flat",
+                                    insertbackground=self.theme.text_primary)
+        self.entry_heures.pack(fill="x", pady=(5, 10), ipady=8)
+
+        # Boutons
+        btn_frame = tk.Frame(content, bg=self.theme.bg_primary)
+        btn_frame.pack(fill="x", padx=40, pady=20)
+
+        cancel = tk.Label(btn_frame, text="Annuler", font=("Segoe UI", 11, "bold"),
+                         fg=self.theme.text_primary, bg=self.theme.bg_card,
+                         padx=25, pady=10, cursor="hand2")
+        cancel.pack(side="left")
+        cancel.bind("<Button-1>", lambda e: self._navigate("projects"))
+
+        save = tk.Label(btn_frame, text="Créer le projet", font=("Segoe UI", 11, "bold"),
+                       fg=self.theme.text_primary, bg=self.theme.success,
+                       padx=25, pady=10, cursor="hand2")
+        save.pack(side="right")
+        save.bind("<Button-1>", lambda e: self._save_project())
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+    def _save_project(self):
+        """Sauvegarde un nouveau projet."""
+        nom = self.entry_nom.get().strip()
+        if not nom:
+            messagebox.showerror("Erreur", "Veuillez entrer un nom de projet.")
+            return
+
+        try:
+            revenus = float(self.entry_revenus.get() or 0)
+            fixes = float(self.entry_fixes.get() or 0)
+            variables = float(self.entry_variables.get() or 0)
+            objectif = float(self.entry_objectif.get() or 0)
+            duree = int(self.entry_duree.get() or 12)
+            heures = float(self.entry_heures.get() or 0)
+        except ValueError:
+            messagebox.showerror("Erreur", "Valeurs numériques invalides.")
+            return
+
+        projet = storage.creer_projet(nom)
+        projet["finances"] = {
+            "revenus": revenus,
+            "depenses_fixes": fixes,
+            "depenses_variables": variables,
+            "objectif": objectif,
+            "duree_mois": duree
+        }
+
+        jours_map = {"lun": "lundi", "mar": "mardi", "mer": "mercredi",
+                    "jeu": "jeudi", "ven": "vendredi", "sam": "samedi", "dim": "dimanche"}
+        jours_dispo = [jours_map[j] for j, v in self.jours_vars.items() if v.get()]
+
+        if jours_dispo and heures > 0:
+            projet["planning"] = planning.generer_planning(jours_dispo, heures)
+        else:
+            projet["planning"] = planning.creer_planning_vide()
+
+        projet["simulation"] = finance.analyser_finances(projet)
+        projet["progression"] = finance.calculer_progression(projet["simulation"], objectif)
+
+        if storage.ajouter_projet(projet):
+            # Achievement
+            self.achievements.enregistrer_activite("projet_cree")
+            self._sauvegarder_achievements()
+
+            messagebox.showinfo("Succès", f"Projet '{nom}' créé !")
+            self._navigate("projects")
+        else:
+            messagebox.showerror("Erreur", "Erreur lors de la sauvegarde.")
+
+    def _show_timer(self):
+        """Affiche le timer Pomodoro."""
+        self._clear_main()
+
+        content = tk.Frame(self.main, bg=self.theme.bg_primary)
+        content.pack(fill="both", expand=True)
+
+        tk.Label(content, text="Timer Pomodoro", font=("Segoe UI", 24, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(pady=30)
+
+        # Timer display
+        timer_frame = tk.Frame(content, bg=self.theme.bg_card, padx=60, pady=40)
+        timer_frame.pack(pady=20)
+
+        self.timer_label = tk.Label(timer_frame, text="25:00", font=("Segoe UI", 72, "bold"),
+                                   fg=self.theme.accent, bg=self.theme.bg_card)
+        self.timer_label.pack()
+
+        self.timer_status = tk.Label(timer_frame, text="Prêt à démarrer",
+                                    font=("Segoe UI", 14), fg=self.theme.text_secondary,
+                                    bg=self.theme.bg_card)
+        self.timer_status.pack(pady=10)
+
+        # Boutons
+        btn_frame = tk.Frame(content, bg=self.theme.bg_primary)
+        btn_frame.pack(pady=20)
+
+        start_btn = tk.Label(btn_frame, text="▶️ Démarrer", font=("Segoe UI", 12, "bold"),
+                            fg=self.theme.text_primary, bg=self.theme.success,
+                            padx=30, pady=12, cursor="hand2")
+        start_btn.pack(side="left", padx=10)
+        start_btn.bind("<Button-1>", lambda e: self._start_timer())
+
+        pause_btn = tk.Label(btn_frame, text="⏸️ Pause", font=("Segoe UI", 12, "bold"),
+                            fg=self.theme.text_primary, bg=self.theme.warning,
+                            padx=30, pady=12, cursor="hand2")
+        pause_btn.pack(side="left", padx=10)
+        pause_btn.bind("<Button-1>", lambda e: self._pause_timer())
+
+        reset_btn = tk.Label(btn_frame, text="🔄 Reset", font=("Segoe UI", 12, "bold"),
+                            fg=self.theme.text_primary, bg=self.theme.danger,
+                            padx=30, pady=12, cursor="hand2")
+        reset_btn.pack(side="left", padx=10)
+        reset_btn.bind("<Button-1>", lambda e: self._reset_timer())
+
+        # Stats
+        stats = self.time_tracker.calculer_statistiques_semaine()
+
+        stats_frame = tk.Frame(content, bg=self.theme.bg_primary)
+        stats_frame.pack(pady=30)
+
+        tk.Label(stats_frame, text="Cette semaine", font=("Segoe UI", 16, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(pady=10)
+
+        stats_grid = tk.Frame(stats_frame, bg=self.theme.bg_primary)
+        stats_grid.pack()
+
+        stat_items = [
+            ("Temps total", f"{stats['temps_total']:.1f}h"),
+            ("Sessions", str(stats["sessions_count"])),
+            ("Pomodoros", str(stats["pomodoros_completes"]))
+        ]
+
+        for label, value in stat_items:
+            card = tk.Frame(stats_grid, bg=self.theme.bg_card, padx=25, pady=15)
+            card.pack(side="left", padx=10)
+
+            tk.Label(card, text=value, font=("Segoe UI", 24, "bold"),
+                    fg=self.theme.accent, bg=self.theme.bg_card).pack()
+            tk.Label(card, text=label, font=("Segoe UI", 10),
+                    fg=self.theme.text_muted, bg=self.theme.bg_card).pack()
+
+    def _start_timer(self):
+        """Démarre le timer."""
+        if not self.timer_running:
+            self.timer_running = True
+            self.time_tracker.pomodoro.demarrer_travail()
+            self._update_timer()
+            self.timer_status.config(text="En cours...")
+
+    def _pause_timer(self):
+        """Met en pause le timer."""
+        self.timer_running = False
+        if self.timer_job:
+            self.root.after_cancel(self.timer_job)
+        self.timer_status.config(text="En pause")
+
+    def _reset_timer(self):
+        """Reset le timer."""
+        self.timer_running = False
+        if self.timer_job:
+            self.root.after_cancel(self.timer_job)
+        self.time_tracker.pomodoro.reinitialiser()
+        self.timer_label.config(text="25:00")
+        self.timer_status.config(text="Prêt à démarrer")
+
+    def _update_timer(self):
+        """Met à jour l'affichage du timer."""
+        if self.timer_running:
+            self.time_tracker.pomodoro.tick()
+            self.timer_label.config(text=self.time_tracker.pomodoro.temps_formate)
+
+            if self.time_tracker.pomodoro.temps_restant <= 0:
+                self.timer_running = False
+                self.timer_status.config(text="Terminé ! 🎉")
+                self._sauvegarder_time_tracker()
+                messagebox.showinfo("Pomodoro", "Session terminée !")
+            else:
+                self.timer_job = self.root.after(1000, self._update_timer)
+
+    def _show_achievements(self):
+        """Affiche les badges."""
+        self._clear_main()
+
+        canvas = tk.Canvas(self.main, bg=self.theme.bg_primary, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.main, orient="vertical", command=canvas.yview)
+        content = tk.Frame(canvas, bg=self.theme.bg_primary)
+
+        content.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=content, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Header
+        tk.Label(content, text="Mes Badges", font=("Segoe UI", 24, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(anchor="w", padx=40, pady=30)
+
+        # Stats
+        niveau = self.achievements.obtenir_progression_niveau()
+        stats_frame = tk.Frame(content, bg=self.theme.bg_primary)
+        stats_frame.pack(fill="x", padx=40, pady=10)
+
+        stat_items = [
+            ("Niveau", str(niveau["niveau"]), obtenir_couleur_niveau(niveau["niveau"])),
+            ("Points", str(niveau["points_totaux"]), self.theme.accent),
+            ("Badges", f"{len(self.achievements.badges_obtenus)}/{len(BADGES)}", self.theme.warning),
+            ("Streak", f"{self.achievements.streak_actuel}j", self.theme.danger)
+        ]
+
+        for label, value, color in stat_items:
+            card = tk.Frame(stats_frame, bg=self.theme.bg_card, padx=25, pady=15)
+            card.pack(side="left", padx=10, expand=True)
+
+            tk.Label(card, text=value, font=("Segoe UI", 28, "bold"),
+                    fg=color, bg=self.theme.bg_card).pack()
+            tk.Label(card, text=label, font=("Segoe UI", 11),
+                    fg=self.theme.text_secondary, bg=self.theme.bg_card).pack()
+
+        # Badges par catégorie
+        categories = self.achievements.obtenir_badges_par_categorie()
+
+        for cat_name, badges in categories.items():
+            cat_frame = tk.Frame(content, bg=self.theme.bg_primary)
+            cat_frame.pack(fill="x", padx=40, pady=15)
+
+            tk.Label(cat_frame, text=cat_name.capitalize(), font=("Segoe UI", 16, "bold"),
+                    fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(anchor="w", pady=10)
+
+            badges_grid = tk.Frame(cat_frame, bg=self.theme.bg_primary)
+            badges_grid.pack(fill="x")
+
+            for badge in badges:
+                self._create_badge_card(badges_grid, badge)
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+    def _create_badge_card(self, parent, badge):
+        """Crée une carte de badge."""
+        obtenu = badge.get("obtenu", False)
+        bg = self.theme.bg_card if obtenu else self.theme.bg_input
+        fg = self.theme.text_primary if obtenu else self.theme.text_muted
+
+        card = tk.Frame(parent, bg=bg, padx=15, pady=12)
+        card.pack(side="left", padx=5, pady=5)
+
+        tk.Label(card, text=badge["icone"], font=("Segoe UI", 24),
+                bg=bg).pack()
+
+        tk.Label(card, text=badge["nom"], font=("Segoe UI", 10, "bold"),
+                fg=fg, bg=bg).pack()
+
+        tk.Label(card, text=f"+{badge['points']}pts", font=("Segoe UI", 8),
+                fg=self.theme.text_muted, bg=bg).pack()
+
+    def _show_scenarios(self):
+        """Affiche les scénarios What-if."""
+        self._clear_main()
+
+        tk.Label(self.main, text="Scénarios What-if", font=("Segoe UI", 24, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(anchor="w", padx=40, pady=30)
+
+        projets = storage.lister_projets()
+        if not projets:
+            tk.Label(self.main, text="Créez d'abord un projet pour utiliser les scénarios.",
+                    font=("Segoe UI", 14), fg=self.theme.text_muted,
+                    bg=self.theme.bg_primary).pack(pady=50)
+            return
+
+        # Sélection projet
+        select_frame = tk.Frame(self.main, bg=self.theme.bg_primary)
+        select_frame.pack(fill="x", padx=40, pady=10)
+
+        tk.Label(select_frame, text="Projet:", font=("Segoe UI", 12),
+                fg=self.theme.text_secondary, bg=self.theme.bg_primary).pack(side="left")
+
+        self.scenario_projet_var = tk.StringVar()
+        self.scenario_projet_var.set(projets[0]["nom"])
+
+        projet_menu = ttk.Combobox(select_frame, textvariable=self.scenario_projet_var,
+                                  values=[p["nom"] for p in projets], state="readonly")
+        projet_menu.pack(side="left", padx=10)
+
+        # Scénarios prédéfinis
+        scenarios_frame = tk.Frame(self.main, bg=self.theme.bg_card, padx=30, pady=20)
+        scenarios_frame.pack(fill="x", padx=40, pady=20)
+
+        tk.Label(scenarios_frame, text="Comparer des scénarios", font=("Segoe UI", 14, "bold"),
+                fg=self.theme.accent, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 15))
+
+        scenarios_options = [
+            ("Réduire dépenses de 100€", {"depenses_ajustement": -100}),
+            ("Réduire dépenses de 200€", {"depenses_ajustement": -200}),
+            ("Augmenter revenus de 200€", {"revenus_ajustement": 200}),
+            ("Objectif +50%", {"objectif_ajustement": 0.5})  # sera calculé
+        ]
+
+        self.scenario_vars = []
+        for label, mods in scenarios_options:
+            var = tk.BooleanVar()
+            cb = tk.Checkbutton(scenarios_frame, text=label, variable=var,
+                               font=("Segoe UI", 11), fg=self.theme.text_primary,
+                               bg=self.theme.bg_card, selectcolor=self.theme.bg_input)
+            cb.pack(anchor="w", pady=2)
+            self.scenario_vars.append((label, mods, var))
+
+        # Bouton comparer
+        compare_btn = tk.Label(scenarios_frame, text="📊 Comparer", font=("Segoe UI", 11, "bold"),
+                              fg=self.theme.text_primary, bg=self.theme.accent,
+                              padx=20, pady=10, cursor="hand2")
+        compare_btn.pack(anchor="w", pady=15)
+        compare_btn.bind("<Button-1>", lambda e: self._run_comparison())
+
+        # Zone résultats
+        self.scenario_results = tk.Frame(self.main, bg=self.theme.bg_primary)
+        self.scenario_results.pack(fill="both", expand=True, padx=40, pady=10)
+
+    def _run_comparison(self):
+        """Exécute la comparaison de scénarios."""
+        # Trouver le projet
+        projets = storage.lister_projets()
+        projet = next((p for p in projets if p["nom"] == self.scenario_projet_var.get()), None)
+
+        if not projet:
+            return
+
+        finances = projet.get("finances", {})
+
+        # Créer les scénarios sélectionnés
+        scenarios = []
+        for label, mods, var in self.scenario_vars:
+            if var.get():
+                if "objectif_ajustement" in mods and mods["objectif_ajustement"] == 0.5:
+                    mods = {"objectif_ajustement": finances.get("objectif", 0) * 0.5}
+                scenarios.append(Scenario(label, mods))
+
+        if not scenarios:
+            messagebox.showinfo("Info", "Sélectionnez au moins un scénario.")
+            return
+
+        # Comparer
+        resultats = comparer_scenarios(finances, scenarios, finances.get("duree_mois", 12))
+
+        # Afficher
+        for widget in self.scenario_results.winfo_children():
+            widget.destroy()
+
+        tk.Label(self.scenario_results, text="Résultats de la comparaison",
+                font=("Segoe UI", 14, "bold"), fg=self.theme.text_primary,
+                bg=self.theme.bg_primary).pack(anchor="w", pady=10)
+
+        # Graphique
+        chart_canvas = tk.Canvas(self.scenario_results, width=600, height=300,
+                                bg=self.theme.bg_card, highlightthickness=0)
+        chart_canvas.pack(pady=10)
+
+        from projectflow.charts import ComparisonChart
+        chart = ComparisonChart(chart_canvas, 0, 0, 600, 300)
+        chart.draw(resultats, "Évolution de l'épargne")
+
+        # Tableau récap
+        for r in resultats:
+            row = tk.Frame(self.scenario_results, bg=self.theme.bg_card, padx=15, pady=10)
+            row.pack(fill="x", pady=2)
+
+            tk.Label(row, text=r["nom"], font=("Segoe UI", 11, "bold"),
+                    fg=r.get("color", self.theme.text_primary),
+                    bg=self.theme.bg_card, width=25, anchor="w").pack(side="left")
+
+            mois_text = f"Mois {r['mois_objectif']}" if r.get("mois_objectif") else "Non atteint"
+            tk.Label(row, text=mois_text, font=("Segoe UI", 11),
+                    fg=self.theme.text_secondary, bg=self.theme.bg_card,
+                    width=15).pack(side="left")
+
+            tk.Label(row, text=f"{r['total']:,.0f}€", font=("Segoe UI", 11, "bold"),
+                    fg=self.theme.success, bg=self.theme.bg_card).pack(side="right")
+
+    def _show_settings(self):
+        """Affiche les paramètres."""
+        self._clear_main()
+
+        tk.Label(self.main, text="Paramètres", font=("Segoe UI", 24, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(anchor="w", padx=40, pady=30)
+
+        # Thème
+        theme_frame = tk.Frame(self.main, bg=self.theme.bg_card, padx=30, pady=20)
+        theme_frame.pack(fill="x", padx=40, pady=10)
+
+        tk.Label(theme_frame, text="Thème", font=("Segoe UI", 14, "bold"),
+                fg=self.theme.accent, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 15))
+
+        themes_grid = tk.Frame(theme_frame, bg=self.theme.bg_card)
+        themes_grid.pack(fill="x")
+
+        for theme_name, theme in THEMES.items():
+            btn = tk.Frame(themes_grid, bg=theme.bg_primary, padx=15, pady=10, cursor="hand2")
+            btn.pack(side="left", padx=5)
+
+            # Preview couleurs
+            preview = tk.Frame(btn, bg=theme.bg_primary)
+            preview.pack()
+
+            for color in [theme.accent, theme.success, theme.warning]:
+                tk.Frame(preview, bg=color, width=20, height=20).pack(side="left", padx=1)
+
+            tk.Label(btn, text=theme.nom, font=("Segoe UI", 9),
+                    fg=theme.text_primary, bg=theme.bg_primary).pack(pady=(5, 0))
+
+            btn.bind("<Button-1>", lambda e, n=theme_name: self._change_theme(n))
+
+        # Pomodoro settings
+        pomo_frame = tk.Frame(self.main, bg=self.theme.bg_card, padx=30, pady=20)
+        pomo_frame.pack(fill="x", padx=40, pady=10)
+
+        tk.Label(pomo_frame, text="Timer Pomodoro", font=("Segoe UI", 14, "bold"),
+                fg=self.theme.accent, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 15))
+
+        pomo_settings = [
+            ("Durée travail (min)", self.time_tracker.pomodoro.DUREE_TRAVAIL),
+            ("Durée pause (min)", self.time_tracker.pomodoro.DUREE_PAUSE),
+            ("Durée pause longue (min)", self.time_tracker.pomodoro.DUREE_PAUSE_LONGUE)
+        ]
+
+        for label, value in pomo_settings:
+            row = tk.Frame(pomo_frame, bg=self.theme.bg_card)
+            row.pack(fill="x", pady=5)
+
+            tk.Label(row, text=label, font=("Segoe UI", 11),
+                    fg=self.theme.text_secondary, bg=self.theme.bg_card).pack(side="left")
+
+            tk.Label(row, text=str(value), font=("Segoe UI", 11, "bold"),
+                    fg=self.theme.text_primary, bg=self.theme.bg_card).pack(side="right")
+
+        # Version
+        tk.Label(self.main, text="ProjectFlow Pro v2.0.0",
+                font=("Segoe UI", 10), fg=self.theme.text_muted,
+                bg=self.theme.bg_primary).pack(pady=30)
+
+    def _change_theme(self, theme_name):
+        """Change le thème."""
+        self.theme_manager.changer_theme(theme_name)
+        messagebox.showinfo("Thème", f"Thème '{THEMES[theme_name].nom}' appliqué.\nRedémarrez l'application pour voir les changements.")
+
+    def _open_project(self, projet):
+        """Ouvre un projet."""
+        self.current_projet = projet
+        self._show_project_details()
+
+    def _show_project_details(self):
+        """Affiche les détails d'un projet."""
+        self._clear_main()
+
+        projet = self.current_projet
+        if not projet:
+            return
+
+        # Scroll
+        canvas = tk.Canvas(self.main, bg=self.theme.bg_primary, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(self.main, orient="vertical", command=canvas.yview)
+        content = tk.Frame(canvas, bg=self.theme.bg_primary)
+
+        content.bind("<Configure>", lambda e: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.create_window((0, 0), window=content, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # Header
+        header = tk.Frame(content, bg=self.theme.bg_primary)
+        header.pack(fill="x", padx=40, pady=30)
+
+        back = tk.Label(header, text="← Retour", font=("Segoe UI", 11),
+                       fg=self.theme.text_secondary, bg=self.theme.bg_primary, cursor="hand2")
+        back.pack(side="left")
+        back.bind("<Button-1>", lambda e: self._navigate("projects"))
+
+        tk.Label(header, text=projet["nom"], font=("Segoe UI", 24, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(side="left", padx=20)
+
+        # Export
+        export_btn = tk.Label(header, text="📄 Exporter", font=("Segoe UI", 11, "bold"),
+                             fg=self.theme.text_primary, bg=self.theme.accent,
+                             padx=15, pady=8, cursor="hand2")
+        export_btn.pack(side="right")
+        export_btn.bind("<Button-1>", lambda e: self._export_project())
+
+        # Contenu
+        finances = projet.get("finances", {})
+        simulation = projet.get("simulation", {})
+
+        # Stats
+        stats_frame = tk.Frame(content, bg=self.theme.bg_primary)
+        stats_frame.pack(fill="x", padx=40, pady=10)
+
+        progression = projet.get("progression", 0)
+        epargne_mens = simulation.get("epargne_mensuelle", 0)
+
+        stats = [
+            ("Progression", f"{progression*100:.0f}%", self.theme.success if progression >= 1 else self.theme.accent),
+            ("Épargne/mois", f"{epargne_mens:,.0f}€", self.theme.success),
+            ("Objectif", f"{finances.get('objectif', 0):,.0f}€", self.theme.warning),
+            ("Total épargné", f"{simulation.get('total_epargne', 0):,.0f}€", self.theme.accent)
+        ]
+
+        for label, value, color in stats:
+            card = tk.Frame(stats_frame, bg=self.theme.bg_card, padx=20, pady=15)
+            card.pack(side="left", padx=5, expand=True)
+
+            tk.Label(card, text=value, font=("Segoe UI", 22, "bold"),
+                    fg=color, bg=self.theme.bg_card).pack()
+            tk.Label(card, text=label, font=("Segoe UI", 10),
+                    fg=self.theme.text_secondary, bg=self.theme.bg_card).pack()
+
+        # Graphique
+        if simulation.get("tableau_mensuel"):
+            chart_frame = tk.Frame(content, bg=self.theme.bg_card, padx=20, pady=20)
+            chart_frame.pack(fill="x", padx=40, pady=15)
+
+            tk.Label(chart_frame, text="Évolution de l'épargne", font=("Segoe UI", 14, "bold"),
+                    fg=self.theme.text_primary, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 10))
+
+            chart_canvas = tk.Canvas(chart_frame, width=700, height=280,
+                                    bg=self.theme.bg_card, highlightthickness=0)
+            chart_canvas.pack()
+
+            chart = LineChart(chart_canvas, 0, 0, 700, 280)
+            chart.draw(simulation["tableau_mensuel"], objectif=finances.get("objectif", 0))
+
+        # Recommandations
+        recommandations = generer_recommandations(finances, simulation)
+        if recommandations:
+            reco_frame = tk.Frame(content, bg=self.theme.bg_card, padx=20, pady=20)
+            reco_frame.pack(fill="x", padx=40, pady=15)
+
+            tk.Label(reco_frame, text="💡 Recommandations", font=("Segoe UI", 14, "bold"),
+                    fg=self.theme.text_primary, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 10))
+
+            for reco in recommandations[:3]:
+                reco_card = tk.Frame(reco_frame, bg=self.theme.bg_input, padx=15, pady=10)
+                reco_card.pack(fill="x", pady=5)
+
+                type_colors = {
+                    "success": self.theme.success,
+                    "warning": self.theme.warning,
+                    "danger": self.theme.danger,
+                    "info": self.theme.accent
+                }
+                color = type_colors.get(reco["type"], self.theme.accent)
+
+                tk.Label(reco_card, text=reco["titre"], font=("Segoe UI", 11, "bold"),
+                        fg=color, bg=self.theme.bg_input).pack(anchor="w")
+                tk.Label(reco_card, text=reco["message"], font=("Segoe UI", 10),
+                        fg=self.theme.text_secondary, bg=self.theme.bg_input,
+                        wraplength=600).pack(anchor="w")
+
+                if reco.get("impact"):
+                    tk.Label(reco_card, text=f"Impact: {reco['impact']}", font=("Segoe UI", 9),
+                            fg=self.theme.text_muted, bg=self.theme.bg_input).pack(anchor="w")
+
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+    def _export_project(self):
+        """Exporte le projet."""
+        if not self.current_projet:
+            return
+
+        filename = filedialog.asksaveasfilename(
+            defaultextension=".html",
+            filetypes=[("HTML", "*.html")],
+            initialfilename=f"rapport_{self.current_projet['nom'].replace(' ', '_')}.html"
+        )
+
+        if filename:
+            try:
+                export_html.exporter_rapport(self.current_projet, filename)
+
+                # Achievement
+                self.achievements.enregistrer_activite("export_realise")
+                self._sauvegarder_achievements()
+
+                messagebox.showinfo("Succès", f"Rapport exporté:\n{filename}")
+            except Exception as e:
+                messagebox.showerror("Erreur", str(e))
+
+    def run(self):
+        """Lance l'application."""
+        self.root.mainloop()
+
+
+def main():
+    app = App()
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
