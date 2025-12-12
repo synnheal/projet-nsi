@@ -31,14 +31,76 @@ from projectflow.finance_advanced import (
 )
 
 
+class ModernButton(tk.Frame):
+    """Bouton moderne avec effets visuels."""
+
+    def __init__(self, parent, text, command, bg_color, fg_color, **kwargs):
+        super().__init__(parent, bg=parent["bg"], cursor="hand2")
+
+        # Effet d'ombre (border simulée)
+        shadow = tk.Frame(self, bg="#00000020", height=2)
+        shadow.pack(side="bottom", fill="x")
+
+        # Bouton principal
+        self.button = tk.Label(self, text=text, font=("Segoe UI", 11, "bold"),
+                              fg=fg_color, bg=bg_color, padx=30, pady=12)
+        self.button.pack()
+
+        # Bindings
+        self.button.bind("<Button-1>", lambda e: command())
+        self.button.bind("<Enter>", self._on_enter)
+        self.button.bind("<Leave>", lambda e: self.button.config(bg=bg_color))
+
+        self.original_bg = bg_color
+        self.hover_bg = self._lighten_color(bg_color)
+
+    def _lighten_color(self, color):
+        """Éclaircit une couleur pour l'effet hover."""
+        # Conversion simple pour simuler un éclaircissement
+        if color.startswith('#'):
+            try:
+                r = int(color[1:3], 16)
+                g = int(color[3:5], 16)
+                b = int(color[5:7], 16)
+                r = min(255, r + 20)
+                g = min(255, g + 20)
+                b = min(255, b + 20)
+                return f"#{r:02x}{g:02x}{b:02x}"
+            except:
+                pass
+        return color
+
+    def _on_enter(self, e):
+        self.button.config(bg=self.hover_bg)
+
+
+class ModernCard(tk.Frame):
+    """Carte moderne avec ombre et bordures arrondies simulées."""
+
+    def __init__(self, parent, bg_color, **kwargs):
+        super().__init__(parent, bg=parent["bg"])
+
+        # Container pour l'effet d'ombre
+        shadow = tk.Frame(self, bg="#00000015")
+        shadow.pack(fill="both", expand=True, padx=(0, 3), pady=(0, 3))
+
+        # Carte principale
+        self.card = tk.Frame(shadow, bg=bg_color, **kwargs)
+        self.card.pack(fill="both", expand=True)
+
+    def get_card(self):
+        """Retourne le frame intérieur pour ajouter du contenu."""
+        return self.card
+
+
 class App:
     """Application principale ProjectFlow avancée."""
 
     def __init__(self):
         self.root = tk.Tk()
-        self.root.title("ProjectFlow Pro")
-        self.root.geometry("1400x800")
-        self.root.minsize(1200, 700)
+        self.root.title("ProjectFlow Pro ✨")
+        self.root.geometry("1450x850")
+        self.root.minsize(1300, 750)
 
         # Gestionnaires
         self.theme_manager = obtenir_theme_manager()
@@ -122,110 +184,170 @@ class App:
 
     def _build_sidebar(self):
         """Construit la sidebar."""
-        # Header avec niveau
+        # Header avec niveau - Version moderne
         header = tk.Frame(self.sidebar, bg=self.theme.bg_secondary)
-        header.pack(fill="x", padx=20, pady=20)
+        header.pack(fill="x", padx=20, pady=25)
 
-        # Logo
-        logo = tk.Label(header, text="ProjectFlow", font=("Segoe UI", 20, "bold"),
+        # Logo avec style moderne
+        logo_container = tk.Frame(header, bg=self.theme.bg_secondary)
+        logo_container.pack()
+
+        logo = tk.Label(logo_container, text="✨ ProjectFlow", font=("Segoe UI", 22, "bold"),
                        fg=self.theme.accent, bg=self.theme.bg_secondary)
         logo.pack()
 
-        # Niveau utilisateur
-        niveau_info = self.achievements.obtenir_progression_niveau()
-        niveau_frame = tk.Frame(header, bg=self.theme.bg_secondary)
-        niveau_frame.pack(pady=10)
+        version = tk.Label(logo_container, text="PRO", font=("Segoe UI", 8, "bold"),
+                          fg=self.theme.text_primary, bg=self.theme.accent,
+                          padx=8, pady=2)
+        version.pack(pady=5)
 
+        # Niveau utilisateur - Card moderne
+        niveau_info = self.achievements.obtenir_progression_niveau()
         titre = obtenir_titre_niveau(niveau_info["niveau"])
         couleur = obtenir_couleur_niveau(niveau_info["niveau"])
 
-        niveau_label = tk.Label(niveau_frame, text=f"Niv. {niveau_info['niveau']} - {titre}",
-                               font=("Segoe UI", 11, "bold"), fg=couleur,
-                               bg=self.theme.bg_secondary)
-        niveau_label.pack()
+        niveau_card = ModernCard(header, self.theme.bg_card)
+        niveau_inner = niveau_card.get_card()
+        niveau_inner.config(padx=15, pady=12)
+        niveau_card.pack(fill="x", pady=15)
 
-        points_label = tk.Label(niveau_frame, text=f"{niveau_info['points_totaux']} pts",
-                               font=("Segoe UI", 9), fg=self.theme.text_muted,
-                               bg=self.theme.bg_secondary)
-        points_label.pack()
+        niveau_label = tk.Label(niveau_inner, text=f"Niveau {niveau_info['niveau']}",
+                               font=("Segoe UI", 10, "bold"), fg=self.theme.text_secondary,
+                               bg=self.theme.bg_card)
+        niveau_label.pack(anchor="w")
 
-        # Barre de progression niveau
-        prog_frame = tk.Frame(header, bg=self.theme.bg_secondary)
-        prog_frame.pack(fill="x", pady=5)
+        titre_label = tk.Label(niveau_inner, text=titre,
+                              font=("Segoe UI", 14, "bold"), fg=couleur,
+                              bg=self.theme.bg_card)
+        titre_label.pack(anchor="w", pady=(2, 8))
 
-        prog_canvas = tk.Canvas(prog_frame, width=200, height=6,
-                               bg=self.theme.bg_input, highlightthickness=0)
-        prog_canvas.pack()
+        # Barre de progression moderne avec pourcentage
+        prog_container = tk.Frame(niveau_inner, bg=self.theme.bg_card)
+        prog_container.pack(fill="x")
+
+        prog_bg = tk.Canvas(prog_container, width=200, height=8,
+                           bg=self.theme.bg_input, highlightthickness=0)
+        prog_bg.pack()
 
         prog_width = int(200 * niveau_info["progression"])
         if prog_width > 0:
-            prog_canvas.create_rectangle(0, 0, prog_width, 6, fill=couleur, outline="")
+            # Barre avec gradient simulé
+            prog_bg.create_rectangle(0, 0, prog_width, 8, fill=couleur, outline="")
 
-        # Navigation
+        points_label = tk.Label(niveau_inner, text=f"{niveau_info['points_totaux']} points",
+                               font=("Segoe UI", 9), fg=self.theme.text_muted,
+                               bg=self.theme.bg_card)
+        points_label.pack(anchor="w", pady=(5, 0))
+
+        # Navigation moderne
         nav_frame = tk.Frame(self.sidebar, bg=self.theme.bg_secondary)
-        nav_frame.pack(fill="x", pady=10)
+        nav_frame.pack(fill="x", pady=20, padx=12)
 
         nav_items = [
-            ("dashboard", "📊", "Tableau de bord"),
-            ("projects", "📁", "Mes Projets"),
-            ("new", "➕", "Nouveau Projet"),
+            ("dashboard", "📊", "Dashboard"),
+            ("projects", "📁", "Projets"),
+            ("new", "➕", "Nouveau"),
             ("timer", "⏱️", "Timer"),
             ("achievements", "🏆", "Badges"),
             ("scenarios", "🔮", "Scénarios"),
-            ("settings", "⚙️", "Paramètres"),
+            ("settings", "⚙️", "Réglages"),
         ]
 
         self.nav_buttons = {}
         for key, icon, text in nav_items:
-            btn = tk.Frame(nav_frame, bg=self.theme.bg_secondary, cursor="hand2")
-            btn.pack(fill="x")
+            # Container pour effet hover moderne
+            btn_container = tk.Frame(nav_frame, bg=self.theme.bg_secondary, cursor="hand2")
+            btn_container.pack(fill="x", pady=3)
 
-            inner = tk.Label(btn, text=f"  {icon}  {text}", font=("Segoe UI", 11),
-                           fg=self.theme.text_secondary, bg=self.theme.bg_secondary,
-                           anchor="w", padx=20, pady=12)
-            inner.pack(fill="x")
+            # Indicateur actif (barre latérale)
+            indicator = tk.Frame(btn_container, bg=self.theme.accent if key == self.current_page else self.theme.bg_secondary,
+                               width=4)
+            indicator.pack(side="left", fill="y")
+
+            inner = tk.Label(btn_container, text=f"  {icon}  {text}", font=("Segoe UI", 11, "bold" if key == self.current_page else "normal"),
+                           fg=self.theme.accent if key == self.current_page else self.theme.text_secondary,
+                           bg=self.theme.bg_card if key == self.current_page else self.theme.bg_secondary,
+                           anchor="w", padx=18, pady=14)
+            inner.pack(side="left", fill="x", expand=True)
 
             inner.bind("<Button-1>", lambda e, k=key: self._navigate(k))
-            inner.bind("<Enter>", lambda e, b=inner: b.config(bg=self.theme.bg_card))
-            inner.bind("<Leave>", lambda e, b=inner, k=key: self._update_nav_style(b, k))
+            inner.bind("<Enter>", lambda e, b=inner, i=indicator: self._nav_hover(b, i, True))
+            inner.bind("<Leave>", lambda e, b=inner, k=key, i=indicator: self._nav_hover(b, i, False, k))
 
-            self.nav_buttons[key] = inner
+            self.nav_buttons[key] = (inner, indicator)
 
-        # Streak en bas
-        streak_frame = tk.Frame(self.sidebar, bg=self.theme.bg_card)
-        streak_frame.pack(side="bottom", fill="x", padx=15, pady=15)
+        # Streak card moderne en bas
+        streak_card = ModernCard(self.sidebar, self.theme.bg_card)
+        streak_inner = streak_card.get_card()
+        streak_inner.config(padx=18, pady=15)
+        streak_card.pack(side="bottom", fill="x", padx=15, pady=20)
 
-        streak_inner = tk.Frame(streak_frame, bg=self.theme.bg_card, padx=15, pady=10)
-        streak_inner.pack(fill="x")
+        # Titre avec icône animée
+        streak_header = tk.Frame(streak_inner, bg=self.theme.bg_card)
+        streak_header.pack(fill="x")
 
-        tk.Label(streak_inner, text="🔥 Streak", font=("Segoe UI", 10, "bold"),
-                fg=self.theme.warning, bg=self.theme.bg_card).pack(anchor="w")
+        tk.Label(streak_header, text="🔥", font=("Segoe UI", 20),
+                bg=self.theme.bg_card).pack(side="left")
 
-        tk.Label(streak_inner, text=f"{self.achievements.streak_actuel} jours",
-                font=("Segoe UI", 18, "bold"), fg=self.theme.text_primary,
+        tk.Label(streak_header, text="Streak", font=("Segoe UI", 11, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_card).pack(side="left", padx=5)
+
+        # Nombre de jours - Grande taille
+        tk.Label(streak_inner, text=f"{self.achievements.streak_actuel}",
+                font=("Segoe UI", 36, "bold"), fg=self.theme.warning,
+                bg=self.theme.bg_card).pack(anchor="w", pady=(8, 0))
+
+        tk.Label(streak_inner, text="jours consécutifs",
+                font=("Segoe UI", 10), fg=self.theme.text_secondary,
                 bg=self.theme.bg_card).pack(anchor="w")
 
-        tk.Label(streak_inner, text=f"Record: {self.achievements.meilleur_streak}",
-                font=("Segoe UI", 9), fg=self.theme.text_muted,
-                bg=self.theme.bg_card).pack(anchor="w")
+        # Record
+        if self.achievements.meilleur_streak > self.achievements.streak_actuel:
+            record_frame = tk.Frame(streak_inner, bg=self.theme.bg_input, padx=10, pady=5)
+            record_frame.pack(fill="x", pady=(10, 0))
+
+            tk.Label(record_frame, text=f"🏆 Record: {self.achievements.meilleur_streak} jours",
+                    font=("Segoe UI", 9, "bold"), fg=self.theme.text_muted,
+                    bg=self.theme.bg_input).pack()
+
+    def _nav_hover(self, button, indicator, is_enter, key=None):
+        """Gère l'effet hover de la navigation."""
+        if is_enter:
+            button.config(bg=self.theme.bg_card)
+            indicator.config(bg=self.theme.accent)
+        else:
+            if key and key == self.current_page:
+                button.config(bg=self.theme.bg_card)
+                indicator.config(bg=self.theme.accent)
+            else:
+                button.config(bg=self.theme.bg_secondary)
+                indicator.config(bg=self.theme.bg_secondary)
 
     def _update_nav_style(self, btn, key):
-        """Met à jour le style de navigation."""
-        if key == self.current_page:
-            btn.config(bg=self.theme.bg_card, fg=self.theme.accent)
-        else:
-            btn.config(bg=self.theme.bg_secondary, fg=self.theme.text_secondary)
+        """Met à jour le style de navigation (legacy - pour compatibilité)."""
+        if isinstance(self.nav_buttons.get(key), tuple):
+            button, indicator = self.nav_buttons[key]
+            if key == self.current_page:
+                button.config(bg=self.theme.bg_card, fg=self.theme.accent, font=("Segoe UI", 11, "bold"))
+                indicator.config(bg=self.theme.accent)
+            else:
+                button.config(bg=self.theme.bg_secondary, fg=self.theme.text_secondary, font=("Segoe UI", 11, "normal"))
+                indicator.config(bg=self.theme.bg_secondary)
 
     def _navigate(self, page):
         """Navigation entre les pages."""
         self.current_page = page
 
-        # Mettre à jour styles
-        for key, btn in self.nav_buttons.items():
-            if key == page:
-                btn.config(bg=self.theme.bg_card, fg=self.theme.accent)
-            else:
-                btn.config(bg=self.theme.bg_secondary, fg=self.theme.text_secondary)
+        # Mettre à jour styles des boutons de navigation
+        for key, nav_item in self.nav_buttons.items():
+            if isinstance(nav_item, tuple):
+                button, indicator = nav_item
+                if key == page:
+                    button.config(bg=self.theme.bg_card, fg=self.theme.accent, font=("Segoe UI", 11, "bold"))
+                    indicator.config(bg=self.theme.accent)
+                else:
+                    button.config(bg=self.theme.bg_secondary, fg=self.theme.text_secondary, font=("Segoe UI", 11, "normal"))
+                    indicator.config(bg=self.theme.bg_secondary)
 
         # Afficher la page
         pages = {
@@ -259,43 +381,63 @@ class App:
         canvas.create_window((0, 0), window=content, anchor="nw")
         canvas.configure(yscrollcommand=scrollbar.set)
 
-        # Header
+        # Header moderne
         header = tk.Frame(content, bg=self.theme.bg_primary)
-        header.pack(fill="x", padx=40, pady=30)
+        header.pack(fill="x", padx=50, pady=35)
 
-        tk.Label(header, text="Tableau de bord", font=("Segoe UI", 24, "bold"),
+        # Titre avec icône
+        title_frame = tk.Frame(header, bg=self.theme.bg_primary)
+        title_frame.pack(side="left")
+
+        tk.Label(title_frame, text="📊", font=("Segoe UI", 28),
+                bg=self.theme.bg_primary).pack(side="left", padx=(0, 10))
+
+        tk.Label(title_frame, text="Tableau de bord", font=("Segoe UI", 28, "bold"),
                 fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(side="left")
 
-        date_str = datetime.now().strftime("%d %B %Y")
-        tk.Label(header, text=date_str, font=("Segoe UI", 12),
-                fg=self.theme.text_muted, bg=self.theme.bg_primary).pack(side="right")
+        # Date moderne
+        date_frame = tk.Frame(header, bg=self.theme.bg_input, padx=15, pady=8)
+        date_frame.pack(side="right")
 
-        # Stats rapides
+        date_str = datetime.now().strftime("%d %B %Y")
+        tk.Label(date_frame, text=f"📅 {date_str}", font=("Segoe UI", 11, "bold"),
+                fg=self.theme.text_secondary, bg=self.theme.bg_input).pack()
+
+        # Stats rapides - Cartes modernes
         stats_frame = tk.Frame(content, bg=self.theme.bg_primary)
-        stats_frame.pack(fill="x", padx=40, pady=10)
+        stats_frame.pack(fill="x", padx=50, pady=15)
 
         projets = storage.lister_projets()
         total_epargne = sum(p.get("simulation", {}).get("total_epargne", 0) for p in projets)
         objectifs_atteints = sum(1 for p in projets if p.get("progression", 0) >= 1)
 
         stats = [
-            ("Projets", len(projets), self.theme.accent, "📁"),
+            ("Projets actifs", len(projets), self.theme.accent, "📁"),
             ("Épargne totale", f"{total_epargne:,.0f}€", self.theme.success, "💰"),
             ("Objectifs atteints", objectifs_atteints, self.theme.warning, "🎯"),
-            ("Badges", len(self.achievements.badges_obtenus), self.theme.danger, "🏆"),
+            ("Badges débloqués", len(self.achievements.badges_obtenus), self.theme.danger, "🏆"),
         ]
 
         for i, (label, value, color, icon) in enumerate(stats):
-            card = tk.Frame(stats_frame, bg=self.theme.bg_card, padx=20, pady=15)
-            card.pack(side="left", padx=10, expand=True, fill="x")
+            # Utiliser ModernCard pour un effet d'ombre
+            modern_card = ModernCard(stats_frame, self.theme.bg_card)
+            card_inner = modern_card.get_card()
+            card_inner.config(padx=22, pady=18)
+            modern_card.pack(side="left", padx=8, expand=True, fill="both")
 
-            tk.Label(card, text=icon, font=("Segoe UI", 24),
-                    bg=self.theme.bg_card).pack(anchor="w")
+            # Icône avec background coloré
+            icon_bg = tk.Frame(card_inner, bg=color, padx=12, pady=8)
+            icon_bg.pack(anchor="w")
 
-            tk.Label(card, text=str(value), font=("Segoe UI", 28, "bold"),
-                    fg=color, bg=self.theme.bg_card).pack(anchor="w")
+            tk.Label(icon_bg, text=icon, font=("Segoe UI", 22),
+                    bg=color).pack()
 
-            tk.Label(card, text=label, font=("Segoe UI", 11),
+            # Valeur en grand
+            tk.Label(card_inner, text=str(value), font=("Segoe UI", 32, "bold"),
+                    fg=color, bg=self.theme.bg_card).pack(anchor="w", pady=(12, 4))
+
+            # Label descriptif
+            tk.Label(card_inner, text=label, font=("Segoe UI", 10),
                     fg=self.theme.text_secondary, bg=self.theme.bg_card).pack(anchor="w")
 
         # Graphiques
@@ -894,62 +1036,150 @@ class App:
         """Affiche les paramètres."""
         self._clear_main()
 
-        tk.Label(self.main, text="Paramètres", font=("Segoe UI", 24, "bold"),
-                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(anchor="w", padx=40, pady=30)
+        # Header moderne
+        header = tk.Frame(self.main, bg=self.theme.bg_primary)
+        header.pack(fill="x", padx=50, pady=35)
 
-        # Thème
-        theme_frame = tk.Frame(self.main, bg=self.theme.bg_card, padx=30, pady=20)
-        theme_frame.pack(fill="x", padx=40, pady=10)
+        title_frame = tk.Frame(header, bg=self.theme.bg_primary)
+        title_frame.pack(side="left")
 
-        tk.Label(theme_frame, text="Thème", font=("Segoe UI", 14, "bold"),
-                fg=self.theme.accent, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 15))
+        tk.Label(title_frame, text="⚙️", font=("Segoe UI", 28),
+                bg=self.theme.bg_primary).pack(side="left", padx=(0, 10))
 
-        themes_grid = tk.Frame(theme_frame, bg=self.theme.bg_card)
+        tk.Label(title_frame, text="Réglages", font=("Segoe UI", 28, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_primary).pack(side="left")
+
+        # Section Thèmes - Carte moderne
+        theme_card = ModernCard(self.main, self.theme.bg_card)
+        theme_inner = theme_card.get_card()
+        theme_inner.config(padx=35, pady=25)
+        theme_card.pack(fill="x", padx=50, pady=15)
+
+        # Titre section
+        section_header = tk.Frame(theme_inner, bg=self.theme.bg_card)
+        section_header.pack(fill="x", pady=(0, 20))
+
+        tk.Label(section_header, text="🎨", font=("Segoe UI", 18),
+                bg=self.theme.bg_card).pack(side="left", padx=(0, 8))
+
+        tk.Label(section_header, text="Thème d'apparence", font=("Segoe UI", 16, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_card).pack(side="left")
+
+        tk.Label(section_header, text="Changement instantané", font=("Segoe UI", 9),
+                fg=self.theme.success, bg=self.theme.bg_card).pack(side="left", padx=10)
+
+        # Grille de thèmes moderne
+        themes_grid = tk.Frame(theme_inner, bg=self.theme.bg_card)
         themes_grid.pack(fill="x")
 
+        current_theme_name = None
+        for name, t in THEMES.items():
+            if t.nom == self.theme.nom:
+                current_theme_name = name
+                break
+
         for theme_name, theme in THEMES.items():
-            btn = tk.Frame(themes_grid, bg=theme.bg_primary, padx=15, pady=10, cursor="hand2")
-            btn.pack(side="left", padx=5)
+            # Carte de thème avec effet hover
+            theme_option = ModernCard(themes_grid, theme.bg_primary)
+            theme_option_inner = theme_option.get_card()
+            theme_option_inner.config(padx=18, pady=15, cursor="hand2")
+            theme_option.pack(side="left", padx=6, pady=5)
 
-            # Preview couleurs
-            preview = tk.Frame(btn, bg=theme.bg_primary)
-            preview.pack()
+            # Indicateur de thème actif
+            if theme_name == current_theme_name:
+                active_indicator = tk.Label(theme_option_inner, text="✓ Actif",
+                                           font=("Segoe UI", 8, "bold"),
+                                           fg=theme.text_primary, bg=theme.success,
+                                           padx=8, pady=2)
+                active_indicator.pack(anchor="e")
 
-            for color in [theme.accent, theme.success, theme.warning]:
-                tk.Frame(preview, bg=color, width=20, height=20).pack(side="left", padx=1)
+            # Preview couleurs - Palette moderne
+            preview = tk.Frame(theme_option_inner, bg=theme.bg_primary)
+            preview.pack(pady=(5, 8))
 
-            tk.Label(btn, text=theme.nom, font=("Segoe UI", 9),
-                    fg=theme.text_primary, bg=theme.bg_primary).pack(pady=(5, 0))
+            colors_to_show = [theme.accent, theme.success, theme.warning, theme.danger]
+            for color in colors_to_show:
+                color_box = tk.Frame(preview, bg=color, width=12, height=35)
+                color_box.pack(side="left", padx=1)
 
-            btn.bind("<Button-1>", lambda e, n=theme_name: self._change_theme(n))
+            # Nom du thème
+            name_label = tk.Label(theme_option_inner, text=theme.nom,
+                                 font=("Segoe UI", 11, "bold"),
+                                 fg=theme.text_primary, bg=theme.bg_primary)
+            name_label.pack(pady=(0, 2))
 
-        # Pomodoro settings
-        pomo_frame = tk.Frame(self.main, bg=self.theme.bg_card, padx=30, pady=20)
-        pomo_frame.pack(fill="x", padx=40, pady=10)
+            # Description de l'ambiance
+            theme_descriptions = {
+                "dark": "Sombre",
+                "light": "Clair",
+                "midnight": "Nuit profonde",
+                "ocean": "Océan",
+                "sunset": "Crépuscule",
+                "forest": "Nature",
+                "nord": "Nordique",
+                "rose": "Romantique"
+            }
 
-        tk.Label(pomo_frame, text="Timer Pomodoro", font=("Segoe UI", 14, "bold"),
-                fg=self.theme.accent, bg=self.theme.bg_card).pack(anchor="w", pady=(0, 15))
+            desc = theme_descriptions.get(theme_name, "")
+            tk.Label(theme_option_inner, text=desc, font=("Segoe UI", 8),
+                    fg=theme.text_muted, bg=theme.bg_primary).pack()
 
+            # Binding pour changer le thème
+            theme_option_inner.bind("<Button-1>", lambda e, n=theme_name: self._change_theme(n))
+            name_label.bind("<Button-1>", lambda e, n=theme_name: self._change_theme(n))
+
+            # Effet hover
+            def on_enter(e, widget=theme_option_inner):
+                widget.config(cursor="hand2")
+
+            theme_option_inner.bind("<Enter>", on_enter)
+
+        # Section Pomodoro - Carte moderne
+        pomo_card = ModernCard(self.main, self.theme.bg_card)
+        pomo_inner = pomo_card.get_card()
+        pomo_inner.config(padx=35, pady=25)
+        pomo_card.pack(fill="x", padx=50, pady=15)
+
+        # Titre section
+        pomo_header = tk.Frame(pomo_inner, bg=self.theme.bg_card)
+        pomo_header.pack(fill="x", pady=(0, 20))
+
+        tk.Label(pomo_header, text="⏱️", font=("Segoe UI", 18),
+                bg=self.theme.bg_card).pack(side="left", padx=(0, 8))
+
+        tk.Label(pomo_header, text="Configuration Timer", font=("Segoe UI", 16, "bold"),
+                fg=self.theme.text_primary, bg=self.theme.bg_card).pack(side="left")
+
+        # Settings avec style moderne
         pomo_settings = [
-            ("Durée travail (min)", self.time_tracker.pomodoro.DUREE_TRAVAIL),
-            ("Durée pause (min)", self.time_tracker.pomodoro.DUREE_PAUSE),
-            ("Durée pause longue (min)", self.time_tracker.pomodoro.DUREE_PAUSE_LONGUE)
+            ("⏳ Durée de travail", self.time_tracker.pomodoro.DUREE_TRAVAIL, "minutes"),
+            ("☕ Durée de pause courte", self.time_tracker.pomodoro.DUREE_PAUSE, "minutes"),
+            ("🌙 Durée de pause longue", self.time_tracker.pomodoro.DUREE_PAUSE_LONGUE, "minutes")
         ]
 
-        for label, value in pomo_settings:
-            row = tk.Frame(pomo_frame, bg=self.theme.bg_card)
-            row.pack(fill="x", pady=5)
+        for icon_label, value, unit in pomo_settings:
+            row = tk.Frame(pomo_inner, bg=self.theme.bg_input, padx=20, pady=12)
+            row.pack(fill="x", pady=4)
 
-            tk.Label(row, text=label, font=("Segoe UI", 11),
-                    fg=self.theme.text_secondary, bg=self.theme.bg_card).pack(side="left")
+            tk.Label(row, text=icon_label, font=("Segoe UI", 11, "bold"),
+                    fg=self.theme.text_primary, bg=self.theme.bg_input).pack(side="left")
 
-            tk.Label(row, text=str(value), font=("Segoe UI", 11, "bold"),
-                    fg=self.theme.text_primary, bg=self.theme.bg_card).pack(side="right")
+            value_frame = tk.Frame(row, bg=self.theme.accent, padx=12, pady=4)
+            value_frame.pack(side="right")
 
-        # Version
-        tk.Label(self.main, text="ProjectFlow Pro v2.0.0",
-                font=("Segoe UI", 10), fg=self.theme.text_muted,
-                bg=self.theme.bg_primary).pack(pady=30)
+            tk.Label(value_frame, text=f"{value} {unit}", font=("Segoe UI", 11, "bold"),
+                    fg=self.theme.text_primary, bg=self.theme.accent).pack()
+
+        # Footer avec version
+        footer = tk.Frame(self.main, bg=self.theme.bg_primary)
+        footer.pack(pady=40)
+
+        version_card = tk.Frame(footer, bg=self.theme.bg_card, padx=25, pady=12)
+        version_card.pack()
+
+        tk.Label(version_card, text="✨ ProjectFlow Pro v2.0.0",
+                font=("Segoe UI", 11, "bold"), fg=self.theme.accent,
+                bg=self.theme.bg_card).pack()
 
     def _refresh_theme(self):
         """Rafraîchit l'interface avec le nouveau thème."""
