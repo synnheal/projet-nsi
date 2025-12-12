@@ -1,0 +1,7 @@
+# Dépendances pour ProjectFlow Pro - Interface Flet
+
+# Interface moderne Flet (basée sur Flutter)
+flet>=0.21.0
+
+# Dépendances existantes du projet
+# (ajoutez ici vos autres dépendances si nécessaire)
