@@ -37,8 +37,8 @@ class ModernButton(tk.Frame):
     def __init__(self, parent, text, command, bg_color, fg_color, **kwargs):
         super().__init__(parent, bg=parent["bg"], cursor="hand2")
 
-        # Effet d'ombre (border simulée)
-        shadow = tk.Frame(self, bg="#00000020", height=2)
+        # Effet d'ombre (border simulée) - couleur grise solide
+        shadow = tk.Frame(self, bg="#d0d0d0", height=2)
         shadow.pack(side="bottom", fill="x")
 
         # Bouton principal
@@ -77,16 +77,41 @@ class ModernButton(tk.Frame):
 class ModernCard(tk.Frame):
     """Carte moderne avec ombre et bordures arrondies simulées."""
 
-    def __init__(self, parent, bg_color, **kwargs):
+    def __init__(self, parent, bg_color, shadow_color=None, **kwargs):
         super().__init__(parent, bg=parent["bg"])
 
+        # Déterminer la couleur d'ombre automatiquement si non fournie
+        if shadow_color is None:
+            # Si bg_color est sombre, utiliser une ombre très sombre, sinon gris clair
+            shadow_color = self._get_shadow_color(bg_color)
+
         # Container pour l'effet d'ombre
-        shadow = tk.Frame(self, bg="#00000015")
+        shadow = tk.Frame(self, bg=shadow_color)
         shadow.pack(fill="both", expand=True, padx=(0, 3), pady=(0, 3))
 
         # Carte principale
         self.card = tk.Frame(shadow, bg=bg_color, **kwargs)
         self.card.pack(fill="both", expand=True)
+
+    def _get_shadow_color(self, bg_color):
+        """Détermine la couleur d'ombre en fonction de la luminosité du fond."""
+        if not bg_color.startswith('#'):
+            return "#d0d0d0"  # Par défaut
+
+        try:
+            # Calculer la luminosité
+            r = int(bg_color[1:3], 16)
+            g = int(bg_color[3:5], 16)
+            b = int(bg_color[5:7], 16)
+            luminosity = (r * 0.299 + g * 0.587 + b * 0.114) / 255
+
+            # Si sombre (luminosité < 0.5), ombre très sombre, sinon gris clair
+            if luminosity < 0.5:
+                return "#0a0a0a"  # Ombre sombre pour thèmes sombres
+            else:
+                return "#e0e0e0"  # Ombre claire pour thèmes clairs
+        except:
+            return "#d0d0d0"
 
     def get_card(self):
         """Retourne le frame intérieur pour ajouter du contenu."""
