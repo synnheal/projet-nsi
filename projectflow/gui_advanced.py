@@ -951,10 +951,28 @@ class App:
                 font=("Segoe UI", 10), fg=self.theme.text_muted,
                 bg=self.theme.bg_primary).pack(pady=30)
 
+    def _refresh_theme(self):
+        """Rafraîchit l'interface avec le nouveau thème."""
+        # Recharger le thème
+        self.theme = self.theme_manager.theme
+
+        # Mettre à jour la couleur de fond principale
+        self.root.configure(bg=self.theme.bg_primary)
+
+        # Reconstruire la sidebar
+        for widget in self.sidebar.winfo_children():
+            widget.destroy()
+        self._build_sidebar()
+
+        # Rafraîchir la page courante
+        current = self.current_page
+        self._navigate(current)
+
     def _change_theme(self, theme_name):
         """Change le thème."""
         self.theme_manager.changer_theme(theme_name)
-        messagebox.showinfo("Thème", f"Thème '{THEMES[theme_name].nom}' appliqué.\nRedémarrez l'application pour voir les changements.")
+        self._refresh_theme()
+        messagebox.showinfo("Thème", f"Thème '{THEMES[theme_name].nom}' appliqué !")
 
     def _open_project(self, projet):
         """Ouvre un projet."""
