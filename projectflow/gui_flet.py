@@ -26,7 +26,7 @@ from projectflow.timer import TimeTracker
 class ModernCard(ft.Container):
     """Carte moderne Flet avec ombre et coins arrondis."""
 
-    def __init__(self, content, **kwargs):
+    def __init__(self, content, padding=20, **kwargs):
         super().__init__(
             content=content,
             border_radius=ft.border_radius.all(16),
@@ -36,7 +36,7 @@ class ModernCard(ft.Container):
                 color="#20000000",  # Noir avec 12% d'opacité
                 offset=ft.Offset(0, 4),
             ),
-            padding=20,
+            padding=padding,
             **kwargs
         )
 
