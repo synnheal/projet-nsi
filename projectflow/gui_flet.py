@@ -33,7 +33,7 @@ class ModernCard(ft.Container):
             shadow=ft.BoxShadow(
                 spread_radius=1,
                 blur_radius=15,
-                color=ft.colors.with_opacity(0.1, ft.colors.BLACK),
+                color="#20000000",  # Noir avec 12% d'opacité
                 offset=ft.Offset(0, 4),
             ),
             padding=20,
@@ -67,7 +67,7 @@ class StatCard(ft.Container):
         label_text = ft.Text(
             label,
             size=12,
-            color=ft.colors.ON_SURFACE_VARIANT,
+            color="#CAC4D0",
         )
 
         super().__init__(
@@ -81,7 +81,7 @@ class StatCard(ft.Container):
             shadow=ft.BoxShadow(
                 spread_radius=1,
                 blur_radius=15,
-                color=ft.colors.with_opacity(0.1, ft.colors.BLACK),
+                color="#20000000",
                 offset=ft.Offset(0, 4),
             ),
             padding=22,
@@ -99,7 +99,7 @@ class NavigationButton(ft.Container):
         # Indicateur actif (barre latérale)
         indicator = ft.Container(
             width=4,
-            bgcolor=ft.colors.PRIMARY if is_active else ft.colors.TRANSPARENT,
+            bgcolor="#6750A4" if is_active else "transparent",
             border_radius=ft.border_radius.only(top_right=2, bottom_right=2),
         )
 
@@ -108,7 +108,7 @@ class NavigationButton(ft.Container):
             ft.Text(f"  {icon}  {label}",
                    size=14,
                    weight=ft.FontWeight.BOLD if is_active else ft.FontWeight.NORMAL,
-                   color=ft.colors.PRIMARY if is_active else ft.colors.ON_SURFACE_VARIANT),
+                   color="#6750A4" if is_active else "#CAC4D0"),
         ], expand=True)
 
         super().__init__(
@@ -116,7 +116,7 @@ class NavigationButton(ft.Container):
                 indicator,
                 button_content,
             ], spacing=0),
-            bgcolor=ft.colors.SURFACE_VARIANT if is_active else ft.colors.TRANSPARENT,
+            bgcolor="#49454F" if is_active else "transparent",
             border_radius=ft.border_radius.only(top_right=12, bottom_right=12),
             padding=ft.padding.only(top=14, bottom=14, right=18),
             on_click=on_click,
@@ -180,7 +180,7 @@ class ProjectFlowApp:
         self.main_content = ft.Container(
             content=self._build_dashboard(),
             expand=True,
-            bgcolor=ft.colors.SURFACE,
+            bgcolor="#1C1B1F",
         )
 
         # Layout principal
@@ -199,13 +199,13 @@ class ProjectFlowApp:
                 ft.Text("✨ ProjectFlow",
                        size=22,
                        weight=ft.FontWeight.BOLD,
-                       color=ft.colors.PRIMARY),
+                       color="#6750A4"),
                 ft.Container(
                     content=ft.Text("PRO",
                                    size=10,
                                    weight=ft.FontWeight.BOLD,
-                                   color=ft.colors.ON_PRIMARY),
-                    bgcolor=ft.colors.PRIMARY,
+                                   color="#FFFFFF"),
+                    bgcolor="#6750A4",
                     border_radius=4,
                     padding=ft.padding.symmetric(horizontal=8, vertical=2),
                 ),
@@ -223,7 +223,7 @@ class ProjectFlowApp:
                 ft.Text(f"Niveau {niveau_info['niveau']}",
                        size=10,
                        weight=ft.FontWeight.BOLD,
-                       color=ft.colors.ON_SURFACE_VARIANT),
+                       color="#CAC4D0"),
                 ft.Text(titre,
                        size=14,
                        weight=ft.FontWeight.BOLD,
@@ -232,14 +232,14 @@ class ProjectFlowApp:
                 ft.ProgressBar(
                     value=niveau_info["progression"],
                     color=couleur_hex,
-                    bgcolor=ft.colors.SURFACE_VARIANT,
+                    bgcolor="#49454F",
                     height=8,
                     border_radius=4,
                 ),
                 ft.Container(height=5),
                 ft.Text(f"{niveau_info['points_totaux']} points",
                        size=9,
-                       color=ft.colors.ON_SURFACE_VARIANT),
+                       color="#CAC4D0"),
             ], spacing=2),
             padding=15,
         )
@@ -273,21 +273,21 @@ class ProjectFlowApp:
                     str(self.achievements.streak_actuel),
                     size=36,
                     weight=ft.FontWeight.BOLD,
-                    color=ft.colors.AMBER,
+                    color="#FFC107",
                 ),
                 ft.Text(
                     "jours consécutifs",
                     size=10,
-                    color=ft.colors.ON_SURFACE_VARIANT,
+                    color="#CAC4D0",
                 ),
                 ft.Container(
                     content=ft.Text(
                         f"🏆 Record: {self.achievements.meilleur_streak} jours",
                         size=9,
                         weight=ft.FontWeight.BOLD,
-                        color=ft.colors.ON_SURFACE_VARIANT,
+                        color="#CAC4D0",
                     ),
-                    bgcolor=ft.colors.SURFACE_VARIANT,
+                    bgcolor="#49454F",
                     border_radius=8,
                     padding=ft.padding.symmetric(horizontal=10, vertical=5),
                     margin=ft.margin.only(top=10),
@@ -307,7 +307,7 @@ class ProjectFlowApp:
                 streak_card,
             ], spacing=0),
             width=280,
-            bgcolor=ft.colors.SURFACE_VARIANT,
+            bgcolor="#49454F",
             padding=ft.padding.only(left=12, top=25, right=12, bottom=20),
         )
 
@@ -329,9 +329,9 @@ class ProjectFlowApp:
                         f"📅 {datetime.now().strftime('%d %B %Y')}",
                         size=11,
                         weight=ft.FontWeight.BOLD,
-                        color=ft.colors.ON_SURFACE_VARIANT,
+                        color="#CAC4D0",
                     ),
-                    bgcolor=ft.colors.SURFACE_VARIANT,
+                    bgcolor="#49454F",
                     border_radius=8,
                     padding=ft.padding.symmetric(horizontal=15, vertical=8),
                 ),
@@ -345,10 +345,10 @@ class ProjectFlowApp:
         objectifs_atteints = sum(1 for p in projets if p.get("progression", 0) >= 1)
 
         stats = ft.Row([
-            StatCard("Projets actifs", str(len(projets)), "📁", ft.colors.BLUE),
-            StatCard("Épargne totale", f"{total_epargne:,.0f}€", "💰", ft.colors.GREEN),
-            StatCard("Objectifs atteints", str(objectifs_atteints), "🎯", ft.colors.ORANGE),
-            StatCard("Badges débloqués", str(len(self.achievements.badges_obtenus)), "🏆", ft.colors.RED),
+            StatCard("Projets actifs", str(len(projets)), "📁", "#2196F3"),
+            StatCard("Épargne totale", f"{total_epargne:,.0f}€", "💰", "#4CAF50"),
+            StatCard("Objectifs atteints", str(objectifs_atteints), "🎯", "#FF9800"),
+            StatCard("Badges débloqués", str(len(self.achievements.badges_obtenus)), "🏆", "#F44336"),
         ], spacing=15)
 
         stats_container = ft.Container(
@@ -366,7 +366,7 @@ class ProjectFlowApp:
                     ft.Container(height=10),
                     ft.Text("Créez votre premier projet pour commencer votre aventure financière !",
                            size=14,
-                           color=ft.colors.ON_SURFACE_VARIANT),
+                           color="#CAC4D0"),
                     ft.Container(height=20),
                     ft.ElevatedButton(
                         "➕ Créer mon premier projet",
@@ -407,20 +407,20 @@ class ProjectFlowApp:
                         ft.Text(f"{progression*100:.0f}%",
                                size=14,
                                weight=ft.FontWeight.BOLD,
-                               color=ft.colors.GREEN if progression >= 1 else ft.colors.PRIMARY),
+                               color="#4CAF50" if progression >= 1 else "#6750A4"),
                     ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
                     ft.Container(height=10),
                     ft.ProgressBar(
                         value=progression,
-                        color=ft.colors.GREEN if progression >= 1 else ft.colors.PRIMARY,
-                        bgcolor=ft.colors.SURFACE_VARIANT,
+                        color="#4CAF50" if progression >= 1 else "#6750A4",
+                        bgcolor="#49454F",
                         height=8,
                         border_radius=4,
                     ),
                     ft.Container(height=10),
                     ft.Text(f"Objectif: {finances.get('objectif', 0):,.0f}€",
                            size=12,
-                           color=ft.colors.ON_SURFACE_VARIANT),
+                           color="#CAC4D0"),
                 ]),
             )
 
@@ -458,7 +458,7 @@ class ProjectFlowApp:
             new_content = ft.Container(
                 content=ft.Column([
                     ft.Text(f"Page {page_key}", size=28, weight=ft.FontWeight.BOLD),
-                    ft.Text("En construction... 🚧", size=16, color=ft.colors.ON_SURFACE_VARIANT),
+                    ft.Text("En construction... 🚧", size=16, color="#CAC4D0"),
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 padding=50,
                 alignment=ft.alignment.center,
@@ -512,7 +512,7 @@ class ProjectFlowApp:
                     content=ft.Text(
                         "✨ Changement instantané",
                         size=9,
-                        color=ft.colors.GREEN,
+                        color="#4CAF50",
                     ),
                     margin=ft.margin.only(top=5),
                 ),
@@ -536,8 +536,8 @@ class ProjectFlowApp:
                         content=ft.Text(f"{self.time_tracker.pomodoro.DUREE_TRAVAIL} minutes",
                                        size=12,
                                        weight=ft.FontWeight.BOLD,
-                                       color=ft.colors.ON_PRIMARY),
-                        bgcolor=ft.colors.PRIMARY,
+                                       color="#FFFFFF"),
+                        bgcolor="#6750A4",
                         border_radius=8,
                         padding=ft.padding.symmetric(horizontal=12, vertical=4),
                     ),
@@ -549,8 +549,8 @@ class ProjectFlowApp:
                         content=ft.Text(f"{self.time_tracker.pomodoro.DUREE_PAUSE} minutes",
                                        size=12,
                                        weight=ft.FontWeight.BOLD,
-                                       color=ft.colors.ON_PRIMARY),
-                        bgcolor=ft.colors.PRIMARY,
+                                       color="#FFFFFF"),
+                        bgcolor="#6750A4",
                         border_radius=8,
                         padding=ft.padding.symmetric(horizontal=12, vertical=4),
                     ),
@@ -562,8 +562,8 @@ class ProjectFlowApp:
                         content=ft.Text(f"{self.time_tracker.pomodoro.DUREE_PAUSE_LONGUE} minutes",
                                        size=12,
                                        weight=ft.FontWeight.BOLD,
-                                       color=ft.colors.ON_PRIMARY),
-                        bgcolor=ft.colors.PRIMARY,
+                                       color="#FFFFFF"),
+                        bgcolor="#6750A4",
                         border_radius=8,
                         padding=ft.padding.symmetric(horizontal=12, vertical=4),
                     ),
@@ -578,9 +578,9 @@ class ProjectFlowApp:
                 "✨ ProjectFlow Pro v2.0.0 - Flet Edition",
                 size=11,
                 weight=ft.FontWeight.BOLD,
-                color=ft.colors.PRIMARY,
+                color="#6750A4",
             ),
-            bgcolor=ft.colors.SURFACE_VARIANT,
+            bgcolor="#49454F",
             border_radius=8,
             padding=ft.padding.symmetric(horizontal=25, vertical=12),
         )
