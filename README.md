@@ -26,7 +26,7 @@ Application de gestion de projets personnels avec simulation budgétaire, planif
 ### Interface Pro (recommandée)
 
 ```bash
-python run_pro.py
+python projectflow.py
 ```
 
 ### Interface standard
