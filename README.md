@@ -384,7 +384,7 @@ Pour plus de détails, consultez :
 
 ## 🤝 Contribution
 
-Projet NSI réalisé par : [Votre Nom]
+Projet NSI réalisé par : Martin & Nathan
 
 Évolutions futures prévues :
 - [ ] Interface graphique complète (Tkinter)
