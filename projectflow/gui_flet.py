@@ -86,7 +86,7 @@ class StatCard(ft.Container):
             ),
             padding=22,
             expand=1,
-            animate=ft.animation.Animation(300, ft.AnimationCurve.EASE_OUT),
+            animate=True,
         )
 
 
@@ -121,7 +121,7 @@ class NavigationButton(ft.Container):
             padding=ft.padding.only(top=14, bottom=14, right=18),
             on_click=on_click,
             ink=True,
-            animate=ft.animation.Animation(200, ft.AnimationCurve.EASE_OUT),
+            animate=True,
         )
 
 
