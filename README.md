@@ -703,9 +703,7 @@ chmod +x stockflow_demo.py
 
 ## 🤝 Contribution
 
-**Projet NSI réalisé par** : [Votre Nom]
 
-### Évolutions Futures
 
 - [ ] Interface web (Flask/Django)
 - [ ] Base de données SQLite
